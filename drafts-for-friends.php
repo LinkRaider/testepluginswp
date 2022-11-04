@@ -340,8 +340,7 @@ class DraftsForFriends
                     if (isset($s)) {
                         foreach ($s as $share):
                             $p = get_post($share['id']);
-                            $url = get_bloginfo('url') . '/?p=' . $p->ID .
-                                '&draftsforfriends='. $share['key']; ?>
+                            $url = get_bloginfo('url') . '/?p=' . $p->ID . '&draftsforfriends='. $share['key']; ?>
                             <tr>
                                 <td><?php echo $p->ID; ?></td>
                                 <td><?php echo $p->post_title; ?></td>
