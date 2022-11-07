@@ -108,7 +108,7 @@ class DraftsForFriends
         add_submenu_page(
             "edit.php", __('Drafts for Friends', 'draftsforfriends'),
             __('Drafts for Friends', 'draftsforfriends'), 1,
-            __FILE__, array($this, 'outputExistingMenuSubAdminPage')
+            'drafts-for-friends.php', array($this, 'outputExistingMenuSubAdminPage')
         );
     }
     
@@ -243,23 +243,6 @@ class DraftsForFriends
         );
         return $ds; 
     }
-    
-    /**
-     * Get all posts for the $user_id specified with the "future" post_status
-     * 
-     * @param $user_id user ID used on the wpdb query
-     * 
-     * @return $wpdb->get_results query result with all posts that meet the criteria
-     **/
-    function getUsersFuture($user_id)
-    {
-        global $wpdb;
-        return $wpdb->get_results(
-            "SELECT ID, post_title FROM $wpdb->posts WHERE post_type = 'post'
-            AND post_status = 'future' AND post_author = $user_id
-            ORDER BY post_modified DESC"
-        );
-    }
 
     /**
      * Get all shared posts
@@ -268,9 +251,7 @@ class DraftsForFriends
      **/    
     function getShared()
     {
-        //if (array_key_exists('shared', $this->user_options)) {
             return $this->user_options['shared'];
-        //}
         
     }
     
@@ -301,12 +282,20 @@ class DraftsForFriends
      */
     function outputExistingMenuSubAdminPage()
     {
-        if (isset($_POST['dff_submit']) && $_POST['dff_submit']) {
-            $t = $this->processPostOptions($_POST);
-        } elseif (isset($_POST['dff_extend']) && $_POST['dff_extend']) {
-            $t = $this->processExtend($_POST);
-        } elseif (isset($_GET['action']) && $_GET['action'] == 'delete') {
-            $t = $this->processDelete($_GET);
+        if (( isset($_POST['dff_nonce']) && wp_verify_nonce(sanitize_text_field($_POST['dff_nonce']), 'submit_nonce' )) ||
+            ( isset($_POST['dff_nonce']) && wp_verify_nonce(sanitize_text_field($_POST['dff_nonce']), 'extend_nonce' )) ||
+            ( isset( $_GET['dff_nonce']) && wp_verify_nonce(sanitize_text_field( $_GET['dff_nonce']), 'delete_nonce' )) )
+        {
+            
+            if (isset($_POST['dff_submit']) ) {
+                $t = $this->processPostOptions($_POST);
+
+            } elseif (isset($_POST['dff_extend'])) {
+                $t = $this->processExtend($_POST);
+
+            } elseif (isset($_GET['action']) && $_GET['action'] == 'delete') {
+                $t = $this->processDelete($_GET);
+            }
         }
         $ds = $this->getDrafts();
         ?>
@@ -316,7 +305,7 @@ class DraftsForFriends
             if (isset($t)) {
                 if ($t) {
                     ?>
-                    <div id="message" class="updated fade"><?php echo $t; ?></div>
+                    <div id="message" class="updated fade"><?php echo esc_html($t); ?></div>
                     <?php
                 }
             }
@@ -342,29 +331,41 @@ class DraftsForFriends
                             $p = get_post($share['id']);
                             $url = get_bloginfo('url') . '/?p=' . $p->ID . '&draftsforfriends='. $share['key']; ?>
                             <tr>
-                                <td><?php echo $p->ID; ?></td>
-                                <td><?php echo $p->post_title; ?></td>
-                                <td><a href="<?php echo $url; ?>">
-                                    <?php echo esc_html($url); ?>
+                                <td><?php echo esc_html($p->ID); ?></td>
+                                <td><?php echo esc_html($p->post_title); ?></td>
+                                <td><a href="<?php echo esc_url($url); ?>">
+                                    <?php echo esc_url($url); ?>
                                 </a></td>
                                 <td class="actions">
-                                    <form class="draftsforfriends-extend" id="draftsforfriends-extend-form-<?php echo $share['key'];?>" action="" method="post">
-                                        <input type="hidden" name="key" value="<?php echo $share['key']; ?>" />
+                                    <form class="draftsforfriends-extend" id="draftsforfriends-extend-form-<?php echo esc_html($share['key']);?>" action="" method="post">
+                                        <input type="hidden" name="key" value="<?php echo esc_attr($share['key']); ?>" />
+                                        <?php wp_nonce_field( 'extend_nonce' , 'dff_nonce' ); ?>
                                         <input type="submit" class="button" name="dff_extend" value="<?php _e('extend', 'draftsforfriends');?>"/>
                                         <?php _e('by', 'draftsforfriends');?>
-                                        <?php echo $this->tmplMeasureSelect(); ?>
-                                        <a class="draftsforfriends-extend-cancel" href="javascript:draftsforfriends.cancel_extend('<?php echo $share['key']; ?>');">
+                                        <input name="expires" type="text" value="2" size="4"/>
+                                        <select name="measure">
+                                            <option value="s"><?php                     __('seconds', 'draftsforfriends')?></option>
+                                            <option value="m"><?php                     __('minutes', 'draftsforfriends')?></option>
+                                            <option value="h" selected="selected"><?php __('hours', 'draftsforfriends')?></option>
+                                            <option value="d"><?php                     __('days', 'draftsforfriends')?></option>
+                                        </select>
+
+                                        <a class="draftsforfriends-extend-cancel" href="javascript:draftsforfriends.cancel_extend('<?php echo esc_html($share['key']); ?>');">
                                             <?php _e('Cancel', 'draftsforfriends');?>
                                         </a>
                                     </form>
                                 </td>
                                 <td class="actions">
-                                    <a class="delete" href="edit.php?page=<?php echo plugin_basename(__FILE__); ?>&amp;action=delete&amp;key=<?php echo $share['key']; ?>"><?php _e('delete', 'draftsforfriends'); ?></a>
+                                    <?php 
+                                        $url = "edit.php?page=drafts-for-friends.php&action=delete&key=".esc_attr($share['key']);
+                                    ?>
+                                    
+                                    <a class="delete" href="<?php echo esc_url(wp_nonce_url(admin_url($url), 'delete_nonce', 'dff_nonce')); ?>"><?php _e('delete', 'draftsforfriends'); ?></a>
                                 </td>
                                 <td>
                                     <?php
                                     if (isset($share['expires'])) {
-                                        echo $this->readableExpireTime($share['expires']);
+                                        echo esc_html($this->readableExpireTime($share['expires']));
                                     }
                                     ?>
                                 </td>
@@ -392,11 +393,11 @@ class DraftsForFriends
                     </option>
                     <?php
                     foreach ($ds as $dt):
-                        if ($dt[1]) :
+                        if ($dt[1]) {
                             ?>
                             <option value="" disabled="disabled"></option>
                             <option value="" disabled="disabled">
-                                <?php echo $dt[0]; ?>
+                                <?php echo esc_html($dt[0]); ?>
                             </option>
                             <?php
                             foreach ($dt[2] as $d):
@@ -404,20 +405,27 @@ class DraftsForFriends
                                     continue;
                                 }
                                 ?>
-                                <option value="<?php echo $d->ID?>">
+                                <option value="<?php echo esc_attr($d->ID)?>">
                                     <?php echo esc_html($d->post_title);?>
                                 </option>
                                 <?php
                             endforeach;
-                        endif;
+                        }
                     endforeach;
                     ?>
                     </select>
                 </p>
                 <p>
                     <input type="submit" class="button" name="dff_submit" value="<?php _e('Share it', 'draftsforfriends'); ?>" />
+                    <?php wp_nonce_field( 'submit_nonce', 'dff_nonce' ); ?>
                     <?php _e('for', 'draftsforfriends'); ?>
-                    <?php echo $this->tmplMeasureSelect(); ?>.
+                    <input name="expires" type="text" value="2" size="4"/>
+                    <select name="measure">
+                        <option value="s"><?php                     __('seconds', 'draftsforfriends')?></option>
+                        <option value="m"><?php                     __('minutes', 'draftsforfriends')?></option>
+                        <option value="h" selected="selected"><?php __('hours', 'draftsforfriends')?></option>
+                        <option value="d"><?php                     __('days', 'draftsforfriends')?></option>
+                    </select>
                 </p>
             </form>
         </div>
@@ -437,19 +445,17 @@ class DraftsForFriends
             $shares = $option['shared'];
             if (isset($shares)) {
                 foreach ($shares as $share) {
-                    if ($share[ 'key'] == $_GET['draftsforfriends'] && $pid) {
+                    if ((isset($_GET['draftsforfriends'])) && $share[ 'key'] == $_GET['draftsforfriends'] && $pid) {
                         return true;
                     }
                 }
+                return false;
             }
-            
         }
-        return false;
     }
-    
+
     /**
-     * Intercepts the post results to validate if the post status is not published
-     * and if the user can see the draft
+     * https://developer.wordpress.org/reference/hooks/posts_results/
      *
      * @param mixed $pp existing posts
      * 
@@ -469,7 +475,7 @@ class DraftsForFriends
     }
     
     /**
-     * Validates which posts can be viewed by the user
+     * https://developer.wordpress.org/reference/hooks/the_posts/
      *
      * @param mixed $pp posts
      * 
@@ -483,28 +489,6 @@ class DraftsForFriends
             $this->shared_post = null;
             return $pp;
         }
-    }
-        
-    /**
-     * Method with the select html tags with the time measure option values
-     *
-     * @return html
-     */
-    function tmplMeasureSelect()
-    {
-        $secs = __('seconds', 'draftsforfriends');
-        $mins = __('minutes', 'draftsforfriends');
-        $hours = __('hours', 'draftsforfriends');
-        $days = __('days', 'draftsforfriends');
-        return <<<SELECT
-            <input name="expires" type="text" value="2" size="4"/>
-            <select name="measure">
-                <option value="s">$secs</option>
-                <option value="m">$mins</option>
-                <option value="h" selected="selected">$hours</option>
-                <option value="d">$days</option>
-            </select>
-            SELECT;
     }
 
     /**
