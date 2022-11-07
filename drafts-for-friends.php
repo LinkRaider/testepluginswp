@@ -433,7 +433,7 @@ class DraftsForFriends
     }
     
     /**
-     * Validates if the user can see the draft
+     * ---
      *
      * @param mixed $pid pid of the user seeing the page
      * 
