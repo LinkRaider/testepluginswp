@@ -113,7 +113,7 @@ class DraftsForFriends
     }
     
     /**
-     * Calculates the remaining expire time
+     * Checks the remaining expire time
      *
      * @param array $params array with the expire time and measure specified
      * 
@@ -132,12 +132,31 @@ class DraftsForFriends
         }
         return $exp * $multiply;
     }
+
+    /**
+     * Returns the expire time in readable format
+     *
+     * @param mixed $expire time left for the post to be seen
+     * 
+     * @return int
+     */
+    function readableExpireTime($expire)
+    {
+        if ($expire>24*3600) {
+            return trim(floor($expire/86400)).' day(s)';
+        } elseif ($expire>3600) {
+            return trim(floor($expire/3600)).' hour(s)';
+        } elseif ($expire>60) {
+            return trim(floor($expire/60)).' minute(s)';
+        } else {
+            return trim($expire).' second(s)';    
+        }
+    }
+    
     
     /**
-     * It validates if the intended post to share has a valid ID,
-     * and if the status is published.
-     * If neither applies, it will add the remaining time,
-     * and will generate a unique key to store with the user permission.
+     * It validates if the intended post to share has a valid ID and if the status is published.
+     * If neither applies, it will add the remaining time and a unique key.
      *
      * @param array $params 
      * 
@@ -193,7 +212,7 @@ class DraftsForFriends
         $shared = array();
         foreach ($this->user_options['shared'] as $share) {
             if ($share['key'] == $params['key']) {
-                $share['expires'] += $this->calc($params);
+                $share['expires'] += $this->calc($params); 
             }
             $shared[] = $share;
         }
@@ -211,36 +230,15 @@ class DraftsForFriends
         global $current_user;
         $args = array(
             'post_author' => $current_user->ID,
-            'post_status' => 'draft'
+            'post_status' => array('draft','pending','future')
         );
         $my_drafts = get_posts($args);
-
-        $args = array(
-            'post_author' => $current_user->ID,
-            'post_status' => 'future'
-        );
-        $my_scheduled = get_posts($args);
-
-        $args = array(
-            'post_author' => $current_user->ID,
-            'post_status' => 'pending'
-        );
-        $my_pending = get_posts($args);
 
         $ds = array(
             array(
                 __('Your Drafts:', 'draftsforfriends'),
                 count($my_drafts), $my_drafts,
-            ),
-            array(
-                __('Your Scheduled Posts:', 'draftsforfriends'),
-                count($my_scheduled), $my_scheduled,
-            ),
-            array(
-                __('Pending Review:', 'draftsforfriends'),
-                count($my_pending), $my_pending,
-            ),
-        );
+            ));
         return $ds; 
     }
 
@@ -251,30 +249,10 @@ class DraftsForFriends
      **/    
     function getShared()
     {
-            return $this->user_options['shared'];
+        return $this->user_options['shared'];
         
     }
-    
-    /**
-     * Returns the expire time in readable format
-     *
-     * @param mixed $expire time left for the post to be seen
-     * 
-     * @return int
-     */
-    function readableExpireTime($expire)
-    {
-        if ($expire>24*3600) {
-            return trim(floor($expire/86400)).' day(s)';
-        } elseif ($expire>3600) {
-            return trim(floor($expire/3600)).' hours(s)';
-        } elseif ($expire>60) {
-            return trim(floor($expire/60)).' minutes(s)';
-        } else {
-            return trim($expire).' second(s)';    
-        }
-    }
-    
+
     /**
      * Sub menu admin html page with js, css and php methods 
      *
@@ -320,7 +298,7 @@ class DraftsForFriends
                     <th colspan="2" class="actions">
                         <?php _e('Actions', 'draftsforfriends');?>
                     </th>
-                    <th><?php _e('Expired After', 'draftsforfriends'); ?></th>
+                    <th><?php _e('Expires After', 'draftsforfriends'); ?></th>
                 </tr>
                 </thead>
                 <tbody>
@@ -344,10 +322,10 @@ class DraftsForFriends
                                         <?php _e('by', 'draftsforfriends');?>
                                         <input name="expires" type="text" value="2" size="4"/>
                                         <select name="measure">
-                                            <option value="s"><?php                     __('seconds', 'draftsforfriends')?></option>
-                                            <option value="m"><?php                     __('minutes', 'draftsforfriends')?></option>
-                                            <option value="h" selected="selected"><?php __('hours', 'draftsforfriends')?></option>
-                                            <option value="d"><?php                     __('days', 'draftsforfriends')?></option>
+                                            <option value="s"><?php                     _e('seconds', 'draftsforfriends')?></option>
+                                            <option value="m"><?php                     _e('minutes', 'draftsforfriends')?></option>
+                                            <option value="h" selected="selected"><?php _e('hours', 'draftsforfriends')?></option>
+                                            <option value="d"><?php                     _e('days', 'draftsforfriends')?></option>
                                         </select>
 
                                         <a class="draftsforfriends-extend-cancel" href="javascript:draftsforfriends.cancel_extend('<?php echo esc_html($share['key']); ?>');">
@@ -365,7 +343,7 @@ class DraftsForFriends
                                 <td>
                                     <?php
                                     if (isset($share['expires'])) {
-                                        echo esc_html($this->readableExpireTime($share['expires']));
+                                        echo esc_html("In ".$this->readableExpireTime($share['expires']));
                                     }
                                     ?>
                                 </td>
@@ -421,10 +399,10 @@ class DraftsForFriends
                     <?php _e('for', 'draftsforfriends'); ?>
                     <input name="expires" type="text" value="2" size="4"/>
                     <select name="measure">
-                        <option value="s"><?php                     __('seconds', 'draftsforfriends')?></option>
-                        <option value="m"><?php                     __('minutes', 'draftsforfriends')?></option>
-                        <option value="h" selected="selected"><?php __('hours', 'draftsforfriends')?></option>
-                        <option value="d"><?php                     __('days', 'draftsforfriends')?></option>
+                        <option value="s"><?php                     _e('seconds', 'draftsforfriends')?></option>
+                        <option value="m"><?php                     _e('minutes', 'draftsforfriends')?></option>
+                        <option value="h" selected="selected"><?php   _e('hours', 'draftsforfriends')?></option>
+                        <option value="d"><?php                        _e('days', 'draftsforfriends')?></option>
                     </select>
                 </p>
             </form>
@@ -433,7 +411,7 @@ class DraftsForFriends
     }
     
     /**
-     * ---
+     * Validates if the user can see the draft
      *
      * @param mixed $pid pid of the user seeing the page
      * 
